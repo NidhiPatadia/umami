@@ -1,5 +1,5 @@
-import 'dotenv/config';
-import pkg from './package.json' with { type: 'json' };
+require('dotenv').config();
+const pkg = require('./package.json');
 
 const TRACKER_SCRIPT = '/script.js';
 
@@ -91,6 +91,12 @@ const headers = [
 ];
 
 const rewrites = [];
+const redirects = [
+  { source: '/settings', destination: '/settings/preferences', permanent: false },
+  { source: '/teams/:id', destination: '/teams/:id/websites', permanent: false },
+  { source: '/teams/:id/settings', destination: '/teams/:id/settings/preferences', permanent: false },
+  { source: '/admin', destination: '/admin/users', permanent: false },
+];
 
 if (trackerScriptURL) {
   rewrites.push({
@@ -111,48 +117,12 @@ if (collectApiEndpoint) {
   });
 }
 
-const redirects = [
-  {
-    source: '/settings',
-    destination: '/settings/preferences',
-    permanent: false,
-  },
-  {
-    source: '/teams/:id',
-    destination: '/teams/:id/websites',
-    permanent: false,
-  },
-  {
-    source: '/teams/:id/settings',
-    destination: '/teams/:id/settings/preferences',
-    permanent: false,
-  },
-  {
-    source: '/admin',
-    destination: '/admin/users',
-    permanent: false,
-  },
-];
-
-// Adding rewrites + headers for all alternative tracker script names.
 if (trackerScriptName) {
-  const names = trackerScriptName?.split(',').map(name => name.trim());
-
-  if (names) {
-    names.forEach(name => {
-      const normalizedSource = `/${name.replace(/^\/+/, '')}`;
-
-      rewrites.push({
-        source: normalizedSource,
-        destination: TRACKER_SCRIPT,
-      });
-
-      headers.push({
-        source: normalizedSource,
-        headers: trackerHeaders,
-      });
-    });
-  }
+  trackerScriptName.split(',').forEach(name => {
+    const src = `/${name.replace(/^\/+/, '')}`;
+    rewrites.push({ source: src, destination: TRACKER_SCRIPT });
+    headers.push({ source: src, headers: trackerHeaders });
+  });
 }
 
 if (cloudMode) {
@@ -162,9 +132,10 @@ if (cloudMode) {
   });
 }
 
-/** @type {import('next').NextConfig} */
-export default {
+module.exports = {
   reactStrictMode: false,
+  basePath,
+  output: 'standalone',
   env: {
     basePath,
     cloudMode,
@@ -172,8 +143,6 @@ export default {
     currentVersion: pkg.version,
     defaultLocale,
   },
-  basePath,
-  output: 'standalone',
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -186,17 +155,11 @@ export default {
   async rewrites() {
     return [
       ...rewrites,
-      {
-        source: '/telemetry.js',
-        destination: '/api/scripts/telemetry',
-      },
-      {
-        source: '/teams/:teamId/:path*',
-        destination: '/:path*',
-      },
+      { source: '/telemetry.js', destination: '/api/scripts/telemetry' },
+      { source: '/teams/:teamId/:path*', destination: '/:path*' },
     ];
   },
   async redirects() {
-    return [...redirects];
+    return redirects;
   },
 };
